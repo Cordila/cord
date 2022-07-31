@@ -1,97 +1,97 @@
+import asyncio
 import discord
 from discord.ext import commands
-from dislash import slash_commands, ActionRow, Button, ButtonStyle, MessageInteraction
 
+class SOSView(discord.ui.View):
+    def __init__(self, bot:commands.Bot, player1: discord.Member, player2: discord.Member) -> None:
+        self.bot = bot
+        self.responses: dict[int, str | None] = {player1: None, player2: None}
+        super().__init__(timeout=None)
+    
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user not in self.responses:
+            await interaction.response.send_message("These aren't your buttons! >:(", ephemeral=True)
+            return False
+        
+        if (choice := self.responses[interaction.user]) is not None:
+            await interaction.response.send_message(f"You already chose **{choice}**!", ephemeral=True)
+            return False
+        
+        return True
+
+    @discord.ui.button(label="Split", style=discord.ButtonStyle.green)
+    async def split(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        self.responses[interaction.user] = "split"
+
+        await interaction.response.send_message("You chose **split**, let's hope the other person choses the same!", ephemeral=True)
+        self.check_done_game()
+
+    @discord.ui.button(label="Steal", style=discord.ButtonStyle.red)
+    async def steal(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        self.responses[interaction.user] = "steal"
+
+        await interaction.response.send_message("You chose **steal**, go big or go home!", ephemeral=True)
+        self.check_done_game()
+    
+    def check_done_game(self) -> None:
+        # stops the view when both players have responded
+        if None not in self.responses.values():
+            self.stop()
+            self.bot.dispatch("sos_view_done", self.responses)
+
+    async def edit_results(self, original_message: discord.Message) -> None:
+        """This function is called after the view times out or finishes normally"""
+        self.clear_items()
+        embed = discord.Embed(title="Split or steal, pick wisely!",)
+
+        # one or both players did not respond
+        if None in self.responses.values():
+            no_response = " and ".join(player.mention for player, resp in self.responses.items() if resp is None)
+            embed.description = f"{no_response} did not respond in time D:"
+        
+        # the game is done!
+        else:
+            both_mentions = " and ".join(m.mention for m in self.responses)
+
+            if all(resp == "split" for resp in self.responses.values()):
+                embed.description = f"{both_mentions} both split, therefore the prize is divided equally between them!"
+            
+            elif all(resp == "steal" for resp in self.responses.values()):
+                embed.description = f"{both_mentions} both stole, therefore neither of them get anything!"
+            
+            else:
+                rev_mapping = {v:k for k,v in self.responses.items()}
+                winner, loser = rev_mapping["steal"], rev_mapping["split"]
+
+                embed.description = f"{winner.mention} stole, but {loser.mention} split, therefore {winner.mention} gets the prize!"
+            
+        await original_message.edit(embed=embed, view=self)
 
 class SplitOrSteal(commands.Cog):
-    def __init__(self, bot):
+    def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-        if not hasattr(self.bot, "inter_client"):
-            slash_commands.InteractionClient(self.bot)
-
     @commands.command()
-    @commands.has_any_role(682698693472026749, 658770981816500234, 663162896158556212, 658770586540965911, 855877108055015465)
-    async def sos(self, ctx: commands.Context, player1: discord.Member, player2: discord.Member):
-        actions = ActionRow(
-            Button(style=ButtonStyle.green, label="Split", custom_id="split"),
-            Button(style=ButtonStyle.red, label="Steal", custom_id="steal"),
-        )
+    async def sos(self, ctx: commands.Context, player1: discord.Member, player2: discord.Member) -> None:
+        embed = discord.Embed(title="Split or steal, pick wisely!", description="You have 60 seconds to decide")
+        sos_view = SOSView(self.bot, player1, player2)
+        original_message = await ctx.send(embed=embed, view=sos_view)
 
-        decision_embed = discord.Embed(title="Split or Steal?", description="You have 30 seconds to decide!",
-                                       colour=0x90EE90)
-
-        message = await ctx.send(embed=decision_embed, components=[actions])
-        on_click = message.create_click_listener(timeout=30)
-
-        # choices for both players
-        choices = {player1: None, player2: None}
-
-        # player1's choice
-        @on_click.from_user(player1, cancel_others=False, reset_timeout=False)
-        async def response(inter: MessageInteraction):
-            choice = inter.component.custom_id
-            if choices[player1] is None:
-                choices[player1] = choice
-
-                if choice == "steal":
-                    return await inter.reply("You chose: `steal`, go big or go home!", ephemeral=True)
-
-                if choice == "split":
-                    return await inter.reply("You chose: `split`, let's hope the other person does the same!",
-                                             ephemeral=True)
-
-            return await inter.reply("You already chose, be patient!", ephemeral=True)
-
-        # player2's choice
-        @on_click.from_user(player2, cancel_others=False, reset_timeout=False)
-        async def response(inter: MessageInteraction):
-            choice = inter.component.custom_id
-            if choices[player2] is None:
-                choices[player2] = choice
-
-                if choice == "steal":
-                    return await inter.reply("You chose: `steal`, go big or go home!", ephemeral=True)
-
-                if choice == "split":
-                    return await inter.reply("You chose: `split`, let's hope the other person does the same!",
-                                             ephemeral=True)
-
-            return await inter.reply("You already chose, be patient!", ephemeral=True)
-
-        # acts as a check for both players
-        @on_click.no_checks(cancel_others=False, reset_timeout=False)
-        async def check(inter: MessageInteraction):
-            if inter.author not in (player1, player2):
-                return await inter.reply("These aren't your buttons! >:(", ephemeral=True)
-
-            if None not in choices.values():
-                # kills the manager
-                on_click.kill()
-
-                if choices[player1] == "split" and choices[player2] == "split":
-                    final = f"{player1.mention} and {player2.mention} both split!, therefore the prize is divided equally between them!"
-                if choices[player1] == "steal" and choices[player2] == "steal":
-                    final = f"{player1.mention} and {player2.mention} both stole!, therefore neither of them get anything!"
-                if choices[player1] == "split" and choices[player2] == "steal":
-                    final = f"{player1.mention} split and {player2.mention} stole, therefore {player2.mention} gets the prize!"
-                if choices[player1] == "steal" and choices[player2] == "split":
-                    final = f"{player1.mention} stole and {player2.mention} split, therefore {player1.mention} gets the prize!"
-
-                result_embed = discord.Embed(
-                    title="Split or Steal?",
-                    description=f"{final}",
-                    colour=0x90EE90
-                )
-                return await message.edit(embed=result_embed, components=[])
-
-        @on_click.timeout
-        async def on_timeout():
-            unresponsive_users = [user.mention for user, choice in choices.items() if choice is None]
-
-            unresponsive_reply = " and ".join(unresponsive_users) + " did not reply in time!"
-            await message.edit(content=unresponsive_reply, embed=None, components=[])
-
-
-def setup(bot):
-    bot.add_cog(SplitOrSteal(bot))
+        # we need to do this since interactions which fail interaction_check still renews the timeout in the view
+        try:
+            await self.bot.wait_for("sos_view_done", check=lambda r: player1 in r and player2 in r, timeout=60)
+        except asyncio.TimeoutError:
+            pass
+    
+        await sos_view.edit_results(original_message)
+    
+    @sos.error
+    async def sos_error(self, ctx: commands.Context, error) -> None:
+        if isinstance(error, commands.MemberNotFound):
+            return await ctx.reply("That's not a valid member")
+        
+        if isinstance(error, commands.MissingRequiredArgument):
+            return await ctx.reply("Usage: `??sos <player1> <player2>`")
+        
+async def setup(bot):
+    await bot.add_cog(SplitOrSteal(bot))

@@ -14,6 +14,8 @@ class Donators(commands.Cog):
         self.bot = bot
         self.coll = bot.plugin_db.get_partition(self)
         self.check_expiry.start()
+        self.channel_check.start()
+        self.update_vcs.start()
 
     async def confirm(self, ctx, member: discord.Member, balance, perk_value, perk_level, validity, totdonated, url):
         expiry = datetime.utcnow() + timedelta(days=validity)
@@ -120,10 +122,19 @@ class Donators(commands.Cog):
             embed.add_field(name="Perks Redeemed", value=f"{perk_level}", inline=True)
             embed.add_field(name="Expiry", value=exp, inline=True)
             await ctx.send(embed=embed)
+            if self.channel_check.is_running():
+                self.channel_check.restart()
+            else:
+                self.channel_check.start()
+            if self.update_vcs.is_running():
+                self.update_vcs.restart()
+            else:
+                self.update_vcs.start()
         else:
             await self.coll.insert_one({"user_id": member.id, "balance": amount, "total_donated": amount,
                                         "perk_name": "None", "expiry": "None",
-                                        "Donation": [{"Value": amount, "Date": datetime.utcnow(), "Proof": proof}]})
+                                        "Donation": [{"Value": amount, "Date": datetime.utcnow(), "Proof": proof}],
+                                        "channel_id": "None"})
             check = await self.coll.find_one({"user_id": member.id})
             perk_level = check["perk_name"]
             expiry = check["expiry"]
@@ -141,6 +152,14 @@ class Donators(commands.Cog):
             embed.add_field(name="Perks Redeemed", value=f"{perk_level}", inline=True)
             embed.add_field(name="Expiry", value=exp, inline=True)
             await ctx.send(embed=embed)
+            if self.channel_check.is_running():
+                self.channel_check.restart()
+            else:
+                self.channel_check.start()
+            if self.update_vcs.is_running():
+                self.update_vcs.restart()
+            else:
+                self.update_vcs.start()
 
     @donator.command()
     @checks.has_permissions(PermissionLevel.ADMIN)
@@ -217,7 +236,7 @@ class Donators(commands.Cog):
 
         message = await self.bot.get_channel(payload.channel_id).fetch_message(payload.message_id)
 
-        if message.embeds == []:
+        if not message.embeds:
             return
 
         if "Detailed Donations" in message.embeds[0].title:
@@ -360,7 +379,8 @@ class Donators(commands.Cog):
         """
         if ctx.invoked_subcommand is None:
             return await ctx.send(
-                "Are you looking for `??donator leaderboard total`, `??donator leaderboard balance`,`??donator leaderboard top10` or `??donator leaderboard top1`?")
+                "Are you looking for `??donator leaderboard total`, `??donator leaderboard balance`,`??donator "
+                "leaderboard top10` or `??donator leaderboard top1`?")
 
     @commands.Cog.listener("on_raw_reaction_add")
     @commands.Cog.listener("on_raw_reaction_remove")
@@ -373,7 +393,7 @@ class Donators(commands.Cog):
 
         message = await self.bot.get_channel(payload.channel_id).fetch_message(payload.message_id)
 
-        if message.embeds == []:
+        if not message.embeds:
             return
 
         if message.embeds[0].title in ("**Top Donators**", "**Top Balance**"):
@@ -448,9 +468,11 @@ class Donators(commands.Cog):
                                            {"$sort": {"sum30d": -1}}, {"$limit": 10}]).to_list(None)
         for i in top10:
             value = i["sum30d"]
+            if value <= 0:
+                continue
             user_id = i["user_id"]
             user = await self.bot.fetch_user(user_id)
-            s += f"{user.name} - ${value}\n"
+            s += f"<@{user.id}> - ${value}\n"
         embed = discord.Embed(title="Top 10 Donators", description=s, colour=0x10ea64)
         await ctx.send(embed=embed)
 
@@ -465,7 +487,7 @@ class Donators(commands.Cog):
             value = i["sum90d"]
             user_id = i["user_id"]
             user = await self.bot.fetch_user(user_id)
-            s += f"{user.name} - ${value}\n"
+            s += f"<@{user.id}> - ${value}\n"
         embed = discord.Embed(title="Top 1 Donator", description=s, colour=0x10ea64)
         await ctx.send(embed=embed)
 
@@ -475,7 +497,7 @@ class Donators(commands.Cog):
         Checks if the expiry time > current time.
         """
         try:
-            fetchall = await self.coll.find().sort("expiry", 1).to_list(10)  # Top 10
+            fetchall = await self.coll.find({"expiry": {"$ne": "None"}}).sort("expiry", 1).to_list(10)  # Top 10
             current_time = datetime.utcnow()
             for x in fetchall:
                 if current_time >= x["expiry"]:
@@ -528,6 +550,85 @@ class Donators(commands.Cog):
         except Exception as e:
             print(e)
 
+    @tasks.loop(hours=12)
+    async def channel_check(self):
+        """
+        Get top 10 leaderboard
+        """
+        top10 = await self.coll.aggregate([{"$set": {"Donation30d": {"$filter": {"input": "$Donation", "cond": {
+            "$lt": [{"$dateDiff": {"startDate": "$$this.Date", "endDate": "$$NOW", "unit": "day"}}, 30]}}}}}, {"$set": {
+            "sum30d": {"$sum": {"$filter": {"input": "$Donation30d.Value", "cond": {"$gt": ["$$this", 0]}}}}}},
+                                           {"$sort": {"sum30d": -1}}, {"$limit": 10}]).to_list(None)
+        havechannel = await self.coll.find({"channel_id": {"$ne": "None"}}).to_list(None)
 
-def setup(bot):
-    bot.add_cog(Donators(bot))
+        for i in top10:
+            if i["sum30d"] > 0:
+                user_id = i["user_id"]
+                user = await self.bot.fetch_user(user_id)
+                channel_id = i["channel_id"]
+                if channel_id == "None":
+                    guild = self.bot.get_guild(645753561329696785)
+                    category = guild.get_channel(800961886824824832)
+                    channel = await category.create_text_channel(f"{user.name}", reason="Top 10 Leaderboard")
+                    await self.coll.update_one({"user_id": user_id}, {"$set": {"channel_id": channel.id}})
+                    overwrites = channel.overwrites_for(user)
+                    overwrites.embed_links, overwrites.attach_files, overwrites.external_emojis = True, True, True
+                    overwrites.send_messages, overwrites.view_channel, overwrites.manage_channels = True, True, True
+                    overwrites.manage_messages, overwrites.manage_permissions, overwrites.mention_everyone = True, False, False
+                    await channel.set_permissions(user, overwrite=overwrites)
+                    await channel.send(
+                        f"Welcome to your channel {user.mention}! Thanks for donating! \n You can use the `??au` "
+                        f"command "
+                        f"to add people to this channel!")
+                else:
+                    continue
+            else:
+                continue
+
+        for y in havechannel:
+            user_id = y["user_id"]
+            if user_id in [x["user_id"] for x in top10] and [x["sum30d"] > 0 for x in top10]:
+                continue
+            else:
+                channel_id = y["channel_id"]
+                guild = self.bot.get_guild(645753561329696785)
+                channel = guild.get_channel(channel_id)
+                user = await self.bot.fetch_user(user_id)
+                await channel.send(
+                    f"Your channel will be deleted in 24 hours since you’re no longer in the top 10 donators! Ignore "
+                    f"if you alr got this warning! \n{user.mention}")
+                self.bot.loop.create_task(self.delete_channel(channel_id, user_id))
+
+    async def delete_channel(self, channel_id, user_id):
+        await asyncio.sleep(86400)
+        top10 = await self.coll.aggregate([{"$set": {"Donation30d": {"$filter": {"input": "$Donation", "cond": {
+            "$lt": [{"$dateDiff": {"startDate": "$$this.Date", "endDate": "$$NOW", "unit": "day"}}, 30]}}}}}, {"$set": {
+            "sum30d": {"$sum": {"$filter": {"input": "$Donation30d.Value", "cond": {"$gt": ["$$this", 0]}}}}}},
+                                           {"$sort": {"sum30d": -1}}, {"$limit": 10}]).to_list(None)
+        for z in top10:
+            if user_id == z["user_id"] and z["sum30d"] > 0:
+                return
+
+        guild = self.bot.get_guild(645753561329696785)
+        channel = guild.get_channel(channel_id)
+        await channel.delete(reason="Your channel has been deleted since you’re no longer in the top 10 donators!")
+        await self.coll.update_one({"user_id": user_id}, {"$set": {"channel_id": "None"}})
+
+    @tasks.loop(hours=12)
+    async def update_vcs(self):
+        top3 = await self.coll.find().sort("total_donated", -1).limit(3).to_list(length=3)
+        """Update vcs in a category"""
+        guild = self.bot.get_guild(645753561329696785)
+        top_vcs = [guild.get_channel(i) for i in (877672534890405958, 794480467561938955, 877672580272762921)]
+        for vc, entry in zip(top_vcs, top3):
+            user_id, donated = entry["user_id"], entry["total_donated"]
+            user = self.bot.get_user(user_id) or await self.bot.fetch_user(user_id)
+
+            if f"{user} (${donated})" == vc.name:
+                continue
+
+            await vc.edit(name=f"{user} (${donated})")
+
+
+async def setup(bot):
+    await bot.add_cog(Donators(bot))

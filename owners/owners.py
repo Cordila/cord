@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 from core import checks
 from core.models import PermissionLevel
-from core.thread import Thread
+
 
 class Owners(commands.Cog):
     def __init__(self, bot):
@@ -18,7 +18,7 @@ class Owners(commands.Cog):
     @checks.has_permissions(PermissionLevel.ADMIN)
     async def enabledisable(self, ctx):
         embed = discord.Embed(title="Enables/Disables",
-                              description = "`??disableautoban | ??enableautoban` \n \n `??disabledecancer | ??enabledecancer` \n \n `??disableextras | ??enableextras` \n \n `??disablelock | ??enablelock` \n \n `??disableping | ??enableping` \n \n `??disableshortcut | ??enableshortcut` \n \n `??disablesnipe | ??enablesnipe` \n \n `??disablesuggest | ??enablesuggest` \n \n `??disabletyperacer | ??enabletyperacer` \n \n `??disablear | ??enablear` \n \n `??disablecarl | ??enablecarl` \n \n `??disablesos | ??enablesos` \n \n `??disableselfroles | ??enableselfroles`")
+                              description="`??disableautoban | ??enableautoban` \n \n `??disabledecancer | ??enabledecancer` \n \n `??disableextras | ??enableextras` \n \n `??disablelock | ??enablelock` \n \n `??disableping | ??enableping` \n \n `??disableshortcut | ??enableshortcut` \n \n `??disablesnipe | ??enablesnipe` \n \n `??disablesuggest | ??enablesuggest` \n \n `??disabletyperacer | ??enabletyperacer` \n \n `??disablear | ??enablear` \n \n `??disablecarl | ??enablecarl` \n \n `??disablesos | ??enablesos` \n \n `??disableselfroles | ??enableselfroles`")
         await ctx.send(embed=embed)
 
     @commands.command()
@@ -42,5 +42,6 @@ class Owners(commands.Cog):
         for bot in offline_bots:
             await ctx.send(f"{bot.name}#{bot.discriminator}")
 
-def setup(bot):
-    bot.add_cog(Owners(bot))
+
+async def setup(bot):
+    await bot.add_cog(Owners(bot))

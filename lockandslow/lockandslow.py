@@ -27,12 +27,7 @@ class LockAndSlow(commands.Cog):
         if not channel:
             channel = ctx.channel
 
-        farmer = ctx.guild.get_role(658770981816500234)
-        daughter = ctx.guild.get_role(682698693472026749)
-        owner = ctx.guild.get_role(658770586540965911)
-        admin = ctx.guild.get_role(663162896158556212)
-        allowed_channels = [795879613393666048, 795709746501648384, 756552586248585368, 747853054329487500,
-                            747184622386806824]
+        allowed_channels = [995563300618240100, 995563935874949160, 756552586248585368, 747853054329487500]
         if ctx.author.top_role.id in (855877108055015465, 814004142796046408):
             if channel.id in allowed_channels:
                 if channel.overwrites_for(ctx.guild.default_role).send_messages is None or channel.overwrites_for(
@@ -44,7 +39,7 @@ class LockAndSlow(commands.Cog):
             else:
                 await ctx.send(f"You are not allowed to lock {channel}")
 
-        elif any(role in ctx.author.roles for role in (admin, farmer, daughter, owner)):
+        elif {658770981816500234, 682698693472026749, 658770586540965911, 663162896158556212} & set(ctx.author.roles):
             if channel.overwrites_for(ctx.guild.default_role).send_messages is None or channel.overwrites_for(
                     ctx.guild.default_role).send_messages is True:
                 await channel.set_permissions(ctx.guild.default_role, send_messages=False)
@@ -59,12 +54,7 @@ class LockAndSlow(commands.Cog):
         if not channel:
             channel = ctx.channel
 
-        farmer = ctx.guild.get_role(658770981816500234)
-        daughter = ctx.guild.get_role(682698693472026749)
-        owner = ctx.guild.get_role(658770586540965911)
-        admin = ctx.guild.get_role(663162896158556212)
-        allowed_channels = [795879613393666048, 795709746501648384, 756552586248585368, 747853054329487500,
-                            747184622386806824]
+        allowed_channels = [995563300618240100, 995563935874949160, 756552586248585368, 747853054329487500]
         if ctx.author.top_role.id in (855877108055015465, 814004142796046408):
             if channel.id in allowed_channels:
                 if not channel.overwrites_for(ctx.guild.default_role).send_messages:
@@ -75,7 +65,7 @@ class LockAndSlow(commands.Cog):
             else:
                 await ctx.send(f"You are not allowed to unlock {channel}")
 
-        elif any(role in ctx.author.roles for role in (admin, farmer, daughter, owner)):
+        elif {658770981816500234, 682698693472026749, 658770586540965911, 663162896158556212} & set(ctx.author.roles):
             if not channel.overwrites_for(ctx.guild.default_role).send_messages:
                 await channel.set_permissions(ctx.guild.default_role, send_messages=True)
                 await ctx.send(f"🔒 Unlocked `{channel}`")
@@ -88,7 +78,7 @@ class LockAndSlow(commands.Cog):
         slomo_embed = discord.Embed(
             title=f" A slowmode of {delay} has been activated by a moderator.",
             color=0x363940, timestamp=ctx.message.created_at)
-        slomo_embed.set_footer(text=f'Applied by {ctx.author}', icon_url=ctx.author.avatar_url)
+        slomo_embed.set_footer(text=f'Applied by {ctx.author}', icon_url=ctx.author.avatar)
         await ctx.message.delete()
         await ctx.channel.edit(slowmode_delay=to_seconds(delay))
         await ctx.send(content=None, embed=slomo_embed)
@@ -98,5 +88,5 @@ class LockAndSlow(commands.Cog):
         await ctx.send(f' The current slow mode in the channel is {ctx.channel.slowmode_delay} seconds')
 
 
-def setup(bot):
-    bot.add_cog(LockAndSlow(bot))
+async def setup(bot):
+    await bot.add_cog(LockAndSlow(bot))

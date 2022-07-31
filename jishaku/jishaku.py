@@ -1,2 +1,2 @@
-def setup(bot):
-    bot.load_extension("jishaku")
+async def setup(bot):
+    await bot.load_extension("jishaku")

@@ -1,14 +1,7 @@
 
 **Todo:**
 
-
 **Not being used rn:**
+Stickyroles
 
-NSFWDetector
-
-DailyPoll
-
-DiscordYT
-
-PremiumSupport
 

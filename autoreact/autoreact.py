@@ -13,7 +13,7 @@ class Autoreact(commands.Cog):
 
     @commands.command()
     @checks.has_permissions(PermissionLevel.ADMIN)
-    async def addar(self, ctx, member: discord.Member, emoji: typing.Union[discord.Emoji,str]):
+    async def addar(self, ctx, member: discord.Member, emoji: typing.Union[discord.Emoji, str]):
         check = await self.coll.find_one({"user_id": member.id})
         if check:
             return await ctx.send("The autoreact already exists for this user")
@@ -52,12 +52,13 @@ class Autoreact(commands.Cog):
             convert = x['user_id']
             converted = self.bot.get_user(convert)
             s += f"{converted} (`{convert}`) : {x['reaction']} \n"
-            
+
         stuff = s.splitlines()
-        for i in range(0, len(stuff), 22):            
-            chunk = stuff[i:i + 22]
+        for i in range(0, len(stuff), 25):
+            chunk = stuff[i:i + 25]
             final = "\n".join(chunk)
             await ctx.send(final)
-            
-def setup(bot):
-    bot.add_cog(Autoreact(bot))
+
+
+async def setup(bot):
+    await bot.add_cog(Autoreact(bot))

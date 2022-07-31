@@ -12,11 +12,9 @@ class Carl(commands.Cog):
 
     @commands.command()
     @checks.has_permissions(PermissionLevel.ADMIN)
-    async def addtrigger(self, ctx, trigger: str, title: str, description: str, color: discord.Color = None,
+    async def addtrigger(self, ctx, trigger: str, title: str, description: str, color: discord.Color,
                          allowed_roles: commands.Greedy[discord.Role] = None,
                          channels: commands.Greedy[discord.TextChannel] = None):
-        if color is None:
-            color = 0x00ff00
         if allowed_roles is None:
             allowed_roles = "None"
         else:
@@ -67,16 +65,22 @@ class Carl(commands.Cog):
                 channel = find["channel"]
                 allowed_roles = find["allowed_roles"]
                 embed = discord.Embed(title=title, description=description)
-                for chamention in channel:
-                    chamen = self.bot.get_channel(chamention)
-                    c += f"{chamen.mention}, "
-                for roleid in allowed_roles:
-                    rolename = ctx.guild.get_role(roleid)
-                    r += f"{rolename.name}, "
+                if channel == "None":
+                    c = "None"
+                else:
+                    for chamention in channel:
+                        chamen = self.bot.get_channel(chamention)
+                        c += f"{chamen.mention}, "
+                if allowed_roles == "None":
+                    r = "None"
+                else:                 
+                    for roleid in allowed_roles:
+                        rolename = ctx.guild.get_role(roleid)
+                        r += f"{rolename.name}, "
                 if channel == 'None' and allowed_roles == 'None':
                     await ctx.send("This trigger is allowed everywhere.", embed=embed)
                 if channel == 'None' and allowed_roles != 'None':
-                    await ctx.send(f"This trigger is allowed in all channels but only for these roles: \n {r}.",
+                    await ctx.send(f"This trigger is allowed in all channels but only for these roles: \n {r}",
                                    embed=embed)
                 if channel != 'None' and allowed_roles == 'None':
                     await ctx.send(f"This trigger is allowed in the channels: \n {c} for everyone.", embed=embed)
@@ -127,15 +131,15 @@ class Carl(commands.Cog):
             if message.channel.id != 747853054329487500:
                 return await message.reply("You can only use this command in <#747853054329487500>")
             else:
-                # hacky way to split by ',' and exclude command invocation
-                args = message.content.replace('.donate', '').split(',')
+                # hacky way to split by '/' and exclude command invocation
+                args = message.content.replace('.donate', '').split('/')
 
                 if len(args) < 4 or len(args) >= 5:
                     await message.delete()
                     return await message.channel.send(f"Incorrect arguments {message.author.mention}\n"
-                                                      "use:`.donate <message>,<amount>,<time>,<winners>`\n"
-                                                      "Eg:`.donate Hi this is fire,1m,10m,1`\n"
-                                                      "NOTE: COMMAS AND EACH PART ARE REQUIRED")
+                                                      "use:`.donate <message>/<amount>/<time>/<winners>`\n"
+                                                      "Eg:`.donate Hi this is fire/1m/10m/1`\n"
+                                                      "NOTE: SLASH AND EACH PART ARE REQUIRED")
 
                 donate_embed = discord.Embed(
                     title=f"{message.author} wants to sponsor a giveaway!",
@@ -151,25 +155,25 @@ class Carl(commands.Cog):
                 await message.delete()
 
         if message.content.startswith('.mm'):
-            if message.channel.id != 756004818866405376:
-                return await message.reply("You can only use this command in <#756004818866405376>")
+            if message.channel.id != 995883937287131277:
+                    return await message.reply("You can only use this command in <#995883937287131277>")
             else:
-                # hacky way to split by ',' and exclude command invocation
-                args = message.content.replace('.mm', '').split(',')
+                # hacky way to split by '/' and exclude command invocation
+                args = message.content.replace('.mm', '').split('/')
 
                 if len(args) < 4 or len(args) >= 5:
                     await message.delete()
                     return await message.channel.send(f"Incorrect arguments {message.author.mention}\n"
-                                                      "use:`.mm <item/money you are giving>,<item/money you are receiving>,<what channel>,<who you are fighting/trading>`\n"
-                                                      "Eg:`.mm 850k,pepec,#👊🏻┃fight-here-1,@fire`\n"
-                                                      "NOTE: COMMAS AND EACH PART ARE REQUIRED")
+                                                      "use:`.mm <your bet>/<their bet>/<what channel>/<who you are fighting>`\n"
+                                                      "Eg:`.mm 850k/pepec/#👊🏻┃fight-here-1/@fire`\n"
+                                                      "NOTE: SLASH AND EACH PART ARE REQUIRED")
 
                 mm_embed = discord.Embed(
                     title=f"{message.author} needs a middleman!",
-                    description=f"**Giving**: {args[0]}\n"
-                                f"**Receiving**: {args[1]}\n"
+                    description=f"**My Bet**: {args[0]}\n"
+                                f"**Their Bet**: {args[1]}\n"
                                 f"**Channel**: {args[2]}\n"
-                                f"**Who I'm fighting/trading**: {args[3]}\n",
+                                f"**Who I'm fighting**: {args[3]}\n",
                     timestamp=datetime.now()
                 )
                 mm_embed.set_footer(text="Tag made by Firecracker#3077")
@@ -183,5 +187,5 @@ class Carl(commands.Cog):
         await channel.send(embed=embed)
 
 
-def setup(bot):
-    bot.add_cog(Carl(bot))
+async def setup(bot):
+    await bot.add_cog(Carl(bot))

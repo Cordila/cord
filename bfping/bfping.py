@@ -1,6 +1,9 @@
 import discord
 import asyncio
 from discord.ext import commands
+import re
+
+time_units = {'s': 'seconds', 'm': 'minutes', 'h': 'hours', 'd': 'days', 'w': 'weeks'}
 
 
 class BFPing(commands.Cog):
@@ -14,12 +17,11 @@ class BFPing(commands.Cog):
             gwm = ctx.guild.get_role(855877108055015465)
             await ctx.author.remove_roles(gwm)
             return await ctx.send("Pretty sure you don't want to do that man")
-        if ctx.channel.id == 658779198688722944:
+        if ctx.channel.id == 995523637249585202:
             await ctx.channel.purge(limit=1)
             await ctx.send(f'<@&672889430171713538> {messages}')
         else:
-
-            await ctx.send('You can only use this command in <#658779198688722944>')
+            await ctx.send('You can only use this command in <#995523637249585202>')
 
     @commands.command()
     @commands.has_permissions(manage_messages=True)
@@ -54,11 +56,11 @@ class BFPing(commands.Cog):
             gwm = ctx.guild.get_role(855877108055015465)
             await ctx.author.remove_roles(gwm)
             return await ctx.send("Pretty sure you don't want to do that man")
-        if ctx.channel.id == 709088851234258944:
+        if ctx.channel.id == 995556725694402691:
             await ctx.channel.purge(limit=1)
             await ctx.send(f'<@&684552219344764934> {messages}')
         else:
-            await ctx.send('You can only use this command in <#709088851234258944>')
+            await ctx.send('You can only use this command in <#995556725694402691>')
 
     @commands.command()
     @commands.has_permissions(manage_messages=True)
@@ -67,11 +69,11 @@ class BFPing(commands.Cog):
             gwm = ctx.guild.get_role(855877108055015465)
             await ctx.author.remove_roles(gwm)
             return await ctx.send("Pretty sure you don't want to do that man")
-        if ctx.channel.id == 709088851234258944:
+        if ctx.channel.id == 995556725694402691:
             await ctx.channel.purge(limit=1)
             await ctx.send(f'<@&750908803704160268> {messages}')
         else:
-            await ctx.send('You can only use this command in <#709088851234258944>')
+            await ctx.send('You can only use this command in <#995556725694402691>')
 
     @commands.command()
     @commands.has_permissions(manage_messages=True)
@@ -99,21 +101,43 @@ class BFPing(commands.Cog):
         else:
             await ctx.send('You can only use this command in <#756566417456889965>')
 
+    @staticmethod
+    def to_seconds(s):
+        return int(timedelta(**{
+            time_units.get(m.group('unit').lower(), 'seconds'): int(m.group('val'))
+            for m in re.finditer(r'(?P<val>\d+)(?P<unit>[smhdw]?)', s, flags=re.I)
+        }).total_seconds())
+
     @commands.command()
     @commands.has_any_role(682698693472026749, 663162896158556212, 658770981816500234, 855877108055015465)
-    async def esponsor(self, ctx, member: discord.Member):
+    async def esponsor(self, ctx, member: discord.Member, seconds=None):
         role = ctx.guild.get_role(787572079573598220)
-        if role not in member.roles:
-            await member.add_roles(role)
-            await ctx.send("The role has been added")
-            await asyncio.sleep(300)
-            if role in member.roles:
+        if seconds is None:
+            if role in member.roles:            
                 await member.remove_roles(role)
-                await ctx.send(f"The Event Sponsor role has has been removed from {member.mention}")
-        else:
-            await member.remove_roles(role)
-            await ctx.send("The role has been removed from them!")
+                await ctx.send("The role has been removed from them!")
+            else:
+                await ctx.send("Please specify a time. Eg. `3m`")
+        try:
+            text = seconds
+            seconds = sum(
+                int(num) * {'h': 60 * 60, 'm': 60, 's': 1, ' ': 1}[weight if weight else 's'] for num, weight in
+                re.findall(r'(\d+)\s?([msh])?', text))
+
+            if not 59 < seconds < 3601:
+                await ctx.message.reply("Please keep the time between 1 minute and 1 hour.")
+                raise BaseException
+
+            if role not in member.roles:
+                await member.add_roles(role)
+                await ctx.send("The role has been added")
+                await asyncio.sleep(seconds)
+                if role in member.roles:
+                    await member.remove_roles(role)
+                    await ctx.send(f"The Event Sponsor role has has been removed from {member.mention}")
+        except ValueError:
+            await ctx.message.reply('You must enter a number!')
 
 
-def setup(bot):
-    bot.add_cog(BFPing(bot))
+async def setup(bot):
+    await bot.add_cog(BFPing(bot))

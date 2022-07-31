@@ -7,7 +7,7 @@ import unicodedata
 from unidecode import unidecode
 
 
-class decancer(commands.Cog):
+class Decancer(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.coll = bot.plugin_db.get_partition(self)
@@ -308,11 +308,11 @@ class decancer(commands.Cog):
             return
 
         if len(nice_nick) <= 1:
-            channel = self.bot.get_channel(676931619294281729)
+            channel = self.bot.get_channel(995433424963764254)
             await member.edit(nick=random_nick)
             return await channel.send(f'Decancered `{member.name}` to {random_nick}')
         elif len(nice_nick) >= 2:
-            channel = self.bot.get_channel(676931619294281729)
+            channel = self.bot.get_channel(995433424963764254)
             await member.edit(nick=nice_nick)
             return await channel.send(f'Decancered `{member.name}` to {nice_nick}')
 
@@ -359,23 +359,22 @@ class decancer(commands.Cog):
         commands.has_permissions(manage_nicknames=True)
     )
     @commands.command()
-    async def freezenick(self, ctx, user: discord.Member, *, Nickname: str):
+    async def freezenick(self, ctx, user: discord.Member, *, nickname: str):
         if user.top_role.position >= ctx.author.top_role.position:
             return await ctx.send('<a:youtried:881184651232817232> lol')
-        
+
         frozencheck = await self.coll.find_one({"user_id": str(user.id)})
         if frozencheck:
             return await ctx.send("The user's nickname is alr frozen")
-           
-        frozenadd = {"user_id": str(user.id), "Nickname": Nickname}
-        await ctx.send(f'Trying to freeze {user.nick} to {Nickname}')
+
+        frozenadd = {"user_id": str(user.id), "Nickname": nickname}
+        await ctx.send(f'Trying to freeze {user.nick} to {nickname}')
         try:
             await self.coll.insert_one(frozenadd)
-            await user.edit(nick=Nickname)
+            await user.edit(nick=nickname)
             await ctx.send('Done!')
-        except:
+        except Exception:
             await ctx.send("Something went wrong, please ping Cordila")
-        
 
     @commands.check_any(
         commands.has_permissions(manage_nicknames=True)
@@ -389,5 +388,5 @@ class decancer(commands.Cog):
         await ctx.send(f'I unfreezed <@{user.id}>')
 
 
-def setup(bot):
-    bot.add_cog(decancer(bot))
+async def setup(bot):
+    await bot.add_cog(Decancer(bot))

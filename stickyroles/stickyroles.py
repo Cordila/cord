@@ -20,7 +20,7 @@ class StickyRoles(commands.Cog):
         if check:
             return await ctx.send("This role is already a sticky role")
         await self.add_sticky("1", role)
-        await ctx.send(f"Added `{role.name`}` to the sticky roles")
+        await ctx.send(f"Added `{role.name}` to the sticky roles")
 
     @commands.command()
     async def removesticky(self, ctx, role: discord.Role):
@@ -42,12 +42,13 @@ class StickyRoles(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
-            check = await self.coll.find_one({"member_id": member.id})
-            if check:
-                for role in check["role_id"]:
-                    sticky = member.guild.get_role(role)
-                    await member.add_roles(sticky)
-                await self.coll.delete_one({"member_id": member.id})
+        check = await self.coll.find_one({"member_id": member.id})
+        if check:
+            for role in check["role_id"]:
+                sticky = member.guild.get_role(role)
+                await member.add_roles(sticky)
+            await self.coll.delete_one({"member_id": member.id})
 
-def setup(bot):
-    bot.add_cog(StickyRoles(bot))
+
+async def setup(bot):
+    await bot.add_cog(StickyRoles(bot))

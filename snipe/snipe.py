@@ -1,6 +1,8 @@
 import discord
 from pathlib import Path
 from discord.ext import commands
+from core import checks
+from core.models import PermissionLevel
 
 this_file_directory = Path(__file__).parent.resolve()
 other_file = this_file_directory / "nosnipe.txt"
@@ -24,7 +26,7 @@ class Snipe(commands.Cog):
         if any(word in message.content.lower() for word in nosnipe) or message.author.bot:
             return
         em = discord.Embed(description=message.content)
-        em.set_author(name=message.author.display_name, icon_url=message.author.avatar_url)
+        em.set_author(name=message.author.display_name, icon_url=message.author.avatar)
         em.set_footer(text='Sent at: ')
         em.timestamp = message.created_at
         self.sniped[str(message.channel.id)] = em
@@ -48,8 +50,10 @@ class Snipe(commands.Cog):
     async def snipe(self, ctx, *, channel: discord.TextChannel = None):
         ch = channel or ctx.channel
         member = ctx.author
-        if ctx.channel.id == 882758609921015839:
-            return
+        fetch = await self.coll.find_one({"unique": "nosnipe"})
+        chan = fetch['channels']
+        if ctx.channel.id in chan:
+            return 
         if check_view_perms(ch, member):
             if str(ch.id) not in self.sniped:
                 return await ctx.send('There\'s nothing to be sniped!')
@@ -64,7 +68,7 @@ class Snipe(commands.Cog):
             return
 
         em = discord.Embed(description=f'**Before: ** {before.content}\n**After: ** {after.content}')
-        em.set_author(name=before.author.display_name, icon_url=before.author.avatar_url)
+        em.set_author(name=before.author.display_name, icon_url=before.author.avatar)
         em.set_footer(text='Sent at: ')
         em.timestamp = before.created_at
         self.esniped[str(before.channel.id)] = em
@@ -88,25 +92,57 @@ class Snipe(commands.Cog):
     async def esnipe(self, ctx, *, channel: discord.TextChannel = None):
         ch = channel or ctx.channel
         member = ctx.author
-        if ctx.channel.id == 882758609921015839:
-            return
+        fetch = await self.coll.find_one({"unique": "nosnipe"})
+        chan = fetch['channels']
+        if ctx.channel.id in chan:
+            return 
         if check_view_perms(ch, member):
             if str(ch.id) not in self.esniped:
                 return await ctx.send('There\'s nothing to be sniped!')
             return await ctx.send(embed=self.esniped[str(ch.id)])
         else:
             await ctx.send("You arent supposed to see whats going on here!")
-            
-    @commands.command()
-    async def dontsnipe (self, ctx, channel: discord.TextChannel = None):
+
+    @commands.group(invoke_without_command=True)
+    @checks.has_permissions(PermissionLevel.ADMIN)
+    async def snipes(self, ctx):
+        if ctx.invoked_subcommand is None:
+            await ctx.send("You are probably looking for `??snipes config`")
+
+    @snipes.group(invoke_without_command=True)
+    @checks.has_permissions(PermissionLevel.ADMIN)
+    async def config(self, ctx):
+        if ctx.invoked_subcommand is None:
+            await ctx.send("Config options: \n `nosnipe` - Make the channel unsnipeable \n `yessnipe` - Make the channel snipeable again")
+
+    @config.command()
+    @checks.has_permissions(PermissionLevel.ADMIN)
+    async def nosnipe(self, ctx, channel: discord.TextChannel = None):
+        c = ""
         if channel is None:
-            return await ctx.send('Please specify a channel where you dont want snipe to work!')
+            fetch = await self.coll.find_one({"unique": "nosnipe"})
+            chan = fetch["channels"]
+            for chaid in chan:
+                chai = self.bot.get_channel(chaid)
+                c += f"{chai.mention}, "
+            return await ctx.send(f'Snipe doesnt work in \n {c}')
         check = await self.coll.find_one({'channels': channel.id})
         if check:
             return await ctx.send('This channel is already unsnipeable!')
-        await self.coll.find_one_and_update({"unique": "dontsnipe"}, {"$push": {"channels": channel.id}}, upsert=True)
+        await self.coll.find_one_and_update({"unique": "nosnipe"}, {"$push": {"channels": channel.id}}, upsert=True)
         await ctx.send(f'{channel.mention} is no longer snipeable!')
 
+    @config.command()
+    @checks.has_permissions(PermissionLevel.ADMIN)
+    async def yessnipe(self, ctx, channel: discord.TextChannel = None):
+        if channel is None:
+            return await ctx.send('Please specify a channel where you want snipe to work!')
+        check = await self.coll.find_one({'channels': channel.id})
+        if not check:
+            return await ctx.send('This channel is already snipeable!')
+        await self.coll.find_one_and_update({"unique": "nosnipe"}, {"$pull": {"channels": channel.id}})
+        await ctx.send(f'{channel.mention} is now snipeable!')
 
-def setup(bot):
-    bot.add_cog(Snipe(bot))
+
+async def setup(bot):
+    await bot.add_cog(Snipe(bot))
